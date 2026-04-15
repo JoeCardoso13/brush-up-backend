@@ -10,13 +10,8 @@ primary_region = 'ewr'
   dockerfile = 'Dockerfile'
 
 [env]
-  BRUSH_UP_DB_PATH = '/data/brush_up.db'
-  BRUSH_UP_INPUT_BUDGET = '2000000'
-  BRUSH_UP_OUTPUT_BUDGET = '500000'
-
-[[mounts]]
-  source = 'brush_up_data'
-  destination = '/data'
+  BRUSH_UP_INPUT_BUDGET = '250000'
+  BRUSH_UP_OUTPUT_BUDGET = '60000'
 
 [http_service]
   internal_port = 8080
