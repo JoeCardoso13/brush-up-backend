@@ -1,16 +1,16 @@
 # brush-up-py
 
-A Python teaching agent built on a Zettelkasten-style knowledge graph.
+A multi-language teaching agent (Python, Ruby, JavaScript) built on Zettelkasten-style knowledge graphs.
 
 ## Architecture
 
-- **`notes/`** — 127 atomic markdown notes about Python concepts, interconnected via `[[wikilinks]]`
-- **`src/graph.py`** — Parses notes into a NetworkX `DiGraph`. Nodes carry note content, edges represent wikilinks. Provides 1-hop context gathering and TF-IDF retrieval (`TfidfIndex`)
-- **`src/agent.py`** — Teaching agent. Finds the relevant topic from a user question, gathers 1-hop graph context, builds a system prompt (from `tutor_prompt.md` + context), calls Claude API, and returns token usage
+- **`notes/<language>/`** — atomic markdown notes per language (`python/`, `ruby/`, `javascript/`), interconnected via `[[wikilinks]]`. One graph is built per subdirectory.
+- **`src/graph.py`** — Parses notes into a NetworkX `DiGraph`. `build_graph(dir)` builds one graph; `build_tutors(notes_root)` returns `{name: DiGraph}` for each subdirectory of `notes/`. Provides 1-hop context gathering and TF-IDF retrieval (`TfidfIndex`)
+- **`src/agent.py`** — Teaching agent. Language-agnostic. Finds the relevant topic from a user question, gathers 1-hop graph context, builds a system prompt (from `tutor_prompt.md` + context), calls Claude API, and returns token usage
 - **`src/main.py`** — Interactive CLI chat loop
-- **`src/api.py`** — FastAPI backend exposing chat and health endpoints
-- **`src/budget.py`** — In-memory per-user token budget tracking (no persistence, resets on restart)
-- **`tutor_prompt.md`** — Socratic tutor system prompt (do not modify without user approval)
+- **`src/api.py`** — FastAPI backend exposing chat and health endpoints; routes each chat request to the selected tutor's graph/index
+- **`src/budget.py`** — In-memory per-user token budget tracking (no persistence, resets on restart). One budget per `user_id`, shared across tutors.
+- **`tutor_prompt.md`** — Socratic tutor system prompt, language-agnostic (do not modify without user approval)
 
 ## Development
 
@@ -54,3 +54,5 @@ ANTHROPIC_API_KEY=... uvicorn api:app --app-dir src --port 8080
 - Per-user token budget is tracked in-memory via `src/budget.py` (250K input / 60K output defaults, configurable via env vars)
 - No rate limiting — budget tracking is the sole abuse-control mechanism
 - Identity is a frontend-generated UUID in localStorage; ephemeral by design
+- `ChatRequest` takes `tutor: "python" | "ruby" | "javascript"` (defaults to `"python"`); one budget per `user_id`, shared across tutors
+- `/api/health` returns `{"status": "ok", "tutors": {name: node_count}}`

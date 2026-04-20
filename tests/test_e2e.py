@@ -47,8 +47,7 @@ def e2e_client(real_graph):
     api.app.router.lifespan_context = test_lifespan
 
     with TestClient(api.app, raise_server_exceptions=True) as client:
-        api.app.state.graph = real_graph
-        api.app.state.index = TfidfIndex(real_graph)
+        api.app.state.tutors = {"python": (real_graph, TfidfIndex(real_graph))}
         api.app.state.client = mock_client
         api.app.state.budgets = {}
         yield client, mock_client
