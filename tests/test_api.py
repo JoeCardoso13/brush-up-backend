@@ -220,7 +220,7 @@ class TestCors:
             "https://joecardoso.dev",
             "https://www.joecardoso.dev",
             "http://localhost:4321",
-            "https://brush-up-py-git-main-joe.vercel.app",
+            "https://brush-up-git-main-joe.vercel.app",
         ],
     )
     def test_preflight_allows_configured_origins(self, app_client, origin):

@@ -1,13 +1,13 @@
-# Brush Up Python backend
+# Brush Up backend
 
-Backend for [Brush Up Python](https://www.joecardoso.dev/brush-up-py), a small AI-powered Python tutor built to showcase applied product and engineering work.
+Backend for [Brush Up](https://www.joecardoso.dev/brush-up-py), a small AI-powered tutor for Python, Ruby, and JavaScript built to showcase applied product and engineering work.
 
-The app answers Python questions by grounding model responses in a personal Zettelkasten-style knowledge base of interconnected markdown notes. This repository contains the backend API, retrieval pipeline, tutor prompt, and test suite.
+The app answers programming questions by grounding model responses in a personal Zettelkasten-style knowledge base of interconnected markdown notes. This repository contains the backend API, retrieval pipeline, tutor prompt, and test suite.
 
 ## What this does
 
-- Serves a FastAPI chat API for the public brush-up-py frontend
-- Builds a directed knowledge graph from markdown notes in `notes/`
+- Serves a FastAPI chat API for the public brush-up frontend
+- Builds one directed knowledge graph per language from markdown notes in `notes/<language>/`
 - Retrieves the most relevant topic with a lightweight TF-IDF index
 - Expands context with 1-hop graph neighbors before calling Anthropic
 - Tracks per-user token usage in memory to limit abuse on the public demo
@@ -16,7 +16,7 @@ The app answers Python questions by grounding model responses in a personal Zett
 
 ### Flow
 
-1. A user asks a Python question from the frontend.
+1. A user asks a programming question from the frontend, scoped to a specific tutor (Python, Ruby, or JavaScript).
 2. The backend scores the question against the note corpus with TF-IDF retrieval.
 3. The top matching note becomes the primary topic.
 4. The graph expands that topic with connected neighbor notes.
@@ -41,8 +41,8 @@ The app answers Python questions by grounding model responses in a personal Zett
 - `src/main.py`  
   Simple CLI entrypoint for chatting with the tutor locally.
 
-- `notes/`  
-  The teaching corpus: atomic markdown notes on Python concepts with wikilinks between them.
+- `notes/<language>/`  
+  The teaching corpus: atomic markdown notes per language (Python, Ruby, JavaScript) with wikilinks between them.
 
 - `tutor_prompt.md`  
   The tutor's behavioral/system prompt.
@@ -115,7 +115,8 @@ Request body:
 ```json
 {
   "user_id": "browser-generated-id",
-  "question": "What is a Python list comprehension?",
+  "tutor": "python",
+  "question": "What is a list comprehension?",
   "conversation_history": []
 }
 ```
@@ -126,7 +127,7 @@ Response body:
 {
   "response": "A list comprehension is ...",
   "history": [
-    { "role": "user", "content": "What is a Python list comprehension?" },
+    { "role": "user", "content": "What is a list comprehension?" },
     { "role": "assistant", "content": "A list comprehension is ..." }
   ],
   "usage": {
@@ -150,7 +151,7 @@ Behavior notes:
 
 ### `GET /api/health`
 
-Returns service status plus the number of topics loaded into the graph.
+Returns service status plus the number of topics loaded into each tutor's graph, e.g. `{"status": "ok", "tutors": {"python": 127, "ruby": 42, "javascript": 30}}`.
 
 ## Deployment
 

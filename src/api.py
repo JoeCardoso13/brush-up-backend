@@ -1,4 +1,4 @@
-"""FastAPI backend for the brush-up-py Python tutor."""
+"""FastAPI backend for the brush-up multi-language tutor."""
 
 import logging
 import os
@@ -63,7 +63,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="brush-up-py", docs_url=None, redoc_url=None, lifespan=lifespan)
+app = FastAPI(title="brush-up", docs_url=None, redoc_url=None, lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -111,7 +111,7 @@ def chat(req: ChatRequest, request: Request):
             status_code=429,
             content={
                 "error": "budget_exceeded",
-                "detail": "You've used your token allocation. Thanks for trying brush-up-py!",
+                "detail": "You've used your token allocation. Thanks for trying brush-up!",
             },
         )
 

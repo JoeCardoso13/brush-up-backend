@@ -1,4 +1,4 @@
-# brush-up-py
+# brush-up
 
 A multi-language teaching agent (Python, Ruby, JavaScript) built on Zettelkasten-style knowledge graphs.
 
@@ -17,7 +17,7 @@ A multi-language teaching agent (Python, Ruby, JavaScript) built on Zettelkasten
 ```bash
 source .venv/bin/activate
 uv pip install -e ".[dev]"    # uses uv, not pip directly
-.venv/bin/pytest -v
+uv run pytest -v
 ```
 
 - Python 3.13, managed by uv
@@ -56,3 +56,4 @@ ANTHROPIC_API_KEY=... uvicorn api:app --app-dir src --port 8080
 - Identity is a frontend-generated UUID in localStorage; ephemeral by design
 - `ChatRequest` takes `tutor: "python" | "ruby" | "javascript"` (required, no default — each tutor lives on its own frontend page); one budget per `user_id`, shared across tutors
 - `/api/health` returns `{"status": "ok", "tutors": {name: node_count}}`
+- The Fly app name (`brush-up-py`) is the only stale reference to the old single-language naming; renaming would require app re-creation and frontend URL update
