@@ -67,6 +67,11 @@ class TestBuildSystemPrompt:
         assert isinstance(prompt, str)
         assert "Socratic" in prompt  # tutor prompt still present
 
+    def test_no_topic_fallback_is_language_agnostic(self):
+        context = {"topic": "xyzzy", "content": None, "neighbors": {}}
+        prompt = build_system_prompt(context)
+        assert "Python" not in prompt
+
 
 # ── Group G: build_messages ─────────────────────────────────────────────
 

@@ -45,6 +45,16 @@ def build_graph(notes_dir: Path) -> nx.DiGraph:
     return graph
 
 
+def build_tutors(notes_root: Path) -> dict[str, nx.DiGraph]:
+    """Build one DiGraph per subdirectory of notes_root, keyed by subdir name."""
+    notes_root = Path(notes_root)
+    return {
+        sub.name: build_graph(sub)
+        for sub in sorted(notes_root.iterdir())
+        if sub.is_dir()
+    }
+
+
 def get_node_content(graph: nx.DiGraph, topic: str) -> str | None:
     """Return the raw content of a topic node, or None if not found."""
     if topic not in graph:

@@ -1,10 +1,11 @@
-"""FastAPI backend for the brush-up-py Python tutor."""
+"""FastAPI backend for the brush-up multi-language tutor."""
 
 import logging
 import os
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Literal
 
 import anthropic
 from fastapi import FastAPI, Request
@@ -14,7 +15,9 @@ from pydantic import BaseModel, Field
 
 from agent import ask
 from budget import check_budget, record_usage
-from graph import build_graph, TfidfIndex
+from graph import TfidfIndex, build_tutors
+
+Tutor = Literal["python", "ruby", "javascript"]
 
 logger = logging.getLogger("brush-up")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
@@ -51,15 +54,16 @@ ALLOWED_ORIGIN_REGEX = _parse_allowed_origin_regex()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.graph = build_graph(NOTES_DIR)
-    app.state.index = TfidfIndex(app.state.graph)
+    graphs = build_tutors(NOTES_DIR)
+    app.state.tutors = {name: (g, TfidfIndex(g)) for name, g in graphs.items()}
     app.state.client = anthropic.Anthropic(max_retries=3)
     app.state.budgets = {}
-    logger.info("Graph loaded: %d topics", app.state.graph.number_of_nodes())
+    for name, (g, _) in app.state.tutors.items():
+        logger.info("Tutor %s loaded: %d topics", name, g.number_of_nodes())
     yield
 
 
-app = FastAPI(title="brush-up-py", docs_url=None, redoc_url=None, lifespan=lifespan)
+app = FastAPI(title="brush-up", docs_url=None, redoc_url=None, lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -75,6 +79,7 @@ app.add_middleware(
 
 class ChatRequest(BaseModel):
     user_id: str = Field(min_length=1, max_length=100)
+    tutor: Tutor
     question: str = Field(min_length=1, max_length=2000)
     conversation_history: list[dict] = Field(default_factory=list, max_length=50)
 
@@ -90,8 +95,13 @@ class ChatResponse(BaseModel):
 
 @app.post("/api/chat")
 def chat(req: ChatRequest, request: Request):
-    graph = request.app.state.graph
-    index = request.app.state.index
+    tutors = request.app.state.tutors
+    if req.tutor not in tutors:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "tutor_unavailable", "detail": f"Tutor {req.tutor!r} is not loaded."},
+        )
+    graph, index = tutors[req.tutor]
     client = request.app.state.client
     budgets = request.app.state.budgets
 
@@ -101,7 +111,7 @@ def chat(req: ChatRequest, request: Request):
             status_code=429,
             content={
                 "error": "budget_exceeded",
-                "detail": "You've used your token allocation. Thanks for trying brush-up-py!",
+                "detail": "You've used your token allocation. Thanks for trying brush-up!",
             },
         )
 
@@ -150,4 +160,8 @@ def chat(req: ChatRequest, request: Request):
 
 @app.get("/api/health")
 def health(request: Request):
-    return {"status": "ok", "topics": request.app.state.graph.number_of_nodes()}
+    tutors = request.app.state.tutors
+    return {
+        "status": "ok",
+        "tutors": {name: g.number_of_nodes() for name, (g, _) in tutors.items()},
+    }

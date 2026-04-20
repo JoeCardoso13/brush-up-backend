@@ -3,6 +3,7 @@
 from graph import (
     extract_wikilinks,
     build_graph,
+    build_tutors,
     get_node_content,
     get_context,
 )
@@ -98,6 +99,28 @@ class TestBuildGraph:
         # Epsilon is "A.k.a [[Beta]]" — should have edge to Beta
         assert mini_graph.has_edge("Epsilon", "Beta")
         assert mini_graph.out_degree("Epsilon") == 1
+
+
+# ── Group B2: build_tutors ──────────────────────────────────────────────
+
+
+class TestBuildTutors:
+    def test_returns_one_graph_per_subdirectory(self, tmp_path):
+        (tmp_path / "python").mkdir()
+        (tmp_path / "python" / "List.md").write_text("A list links to [[Tuple]].")
+        (tmp_path / "python" / "Tuple.md").write_text("An immutable sequence.")
+
+        (tmp_path / "ruby").mkdir()
+        (tmp_path / "ruby" / "Array.md").write_text("Ruby array links to [[Hash]].")
+        (tmp_path / "ruby" / "Hash.md").write_text("A Ruby mapping.")
+
+        tutors = build_tutors(tmp_path)
+
+        assert set(tutors) == {"python", "ruby"}
+        assert tutors["python"].number_of_nodes() == 2
+        assert tutors["ruby"].number_of_nodes() == 2
+        assert tutors["python"].has_edge("List", "Tuple")
+        assert tutors["ruby"].has_edge("Array", "Hash")
 
 
 # ── Group C: get_node_content ───────────────────────────────────────────

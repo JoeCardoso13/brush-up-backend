@@ -47,8 +47,7 @@ def e2e_client(real_graph):
     api.app.router.lifespan_context = test_lifespan
 
     with TestClient(api.app, raise_server_exceptions=True) as client:
-        api.app.state.graph = real_graph
-        api.app.state.index = TfidfIndex(real_graph)
+        api.app.state.tutors = {"python": (real_graph, TfidfIndex(real_graph))}
         api.app.state.client = mock_client
         api.app.state.budgets = {}
         yield client, mock_client
@@ -58,6 +57,7 @@ def _chat(client, question, history=None):
     """Send a question through POST /api/chat and return (response_json, mock_client)."""
     return client.post("/api/chat", json={
         "user_id": "e2e-test-user",
+        "tutor": "python",
         "question": question,
         "conversation_history": history or [],
     })

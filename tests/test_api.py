@@ -39,11 +39,40 @@ def app_client(mini_notes):
     api.app.router.lifespan_context = test_lifespan
 
     with TestClient(api.app, raise_server_exceptions=True) as client:
-        api.app.state.graph = test_graph
-        api.app.state.index = TfidfIndex(test_graph)
+        api.app.state.tutors = {"python": (test_graph, TfidfIndex(test_graph))}
         api.app.state.client = mock_client
         api.app.state.budgets = test_budgets
         yield client, mock_client, test_budgets
+
+
+@pytest.fixture
+def multi_tutor_client(tmp_path):
+    """TestClient with two distinct tutors wired into app.state.tutors."""
+    import api
+
+    (tmp_path / "py").mkdir()
+    (tmp_path / "py" / "PythonAlpha.md").write_text("PythonAlpha is a python topic.")
+    (tmp_path / "rb").mkdir()
+    (tmp_path / "rb" / "RubyBlock.md").write_text("RubyBlock is a ruby block topic.")
+
+    py_graph = build_graph(tmp_path / "py")
+    rb_graph = build_graph(tmp_path / "rb")
+    mock_client = _make_mock_client()
+
+    @asynccontextmanager
+    async def test_lifespan(app):
+        yield
+
+    api.app.router.lifespan_context = test_lifespan
+
+    with TestClient(api.app, raise_server_exceptions=True) as client:
+        api.app.state.tutors = {
+            "python": (py_graph, TfidfIndex(py_graph)),
+            "ruby": (rb_graph, TfidfIndex(rb_graph)),
+        }
+        api.app.state.client = mock_client
+        api.app.state.budgets = {}
+        yield client, mock_client
 
 
 # ── Group M: POST /api/chat ───────────────────────────────────────────
@@ -54,6 +83,7 @@ class TestChat:
         client, _, _ = app_client
         resp = client.post("/api/chat", json={
             "user_id": "test-user",
+            "tutor": "python",
             "question": "What is Alpha?",
             "conversation_history": [],
         })
@@ -68,6 +98,7 @@ class TestChat:
         client, _, test_budgets = app_client
         client.post("/api/chat", json={
             "user_id": "test-user",
+            "tutor": "python",
             "question": "What is Alpha?",
             "conversation_history": [],
         })
@@ -78,6 +109,7 @@ class TestChat:
         record_usage(test_budgets, "big-spender", 9999999, 9999999)
         resp = client.post("/api/chat", json={
             "user_id": "big-spender",
+            "tutor": "python",
             "question": "What is Alpha?",
             "conversation_history": [],
         })
@@ -88,6 +120,7 @@ class TestChat:
         client, _, _ = app_client
         resp = client.post("/api/chat", json={
             "user_id": "test-user",
+            "tutor": "python",
             "question": "",
             "conversation_history": [],
         })
@@ -105,6 +138,7 @@ class TestChat:
         client, mock_claude, _ = app_client
         client.post("/api/chat", json={
             "user_id": "test-user",
+            "tutor": "python",
             "question": "What is Alpha?",
             "conversation_history": [],
         })
@@ -118,6 +152,7 @@ class TestChat:
         ]
         client.post("/api/chat", json={
             "user_id": "test-user",
+            "tutor": "python",
             "question": "What is Alpha?",
             "conversation_history": history,
         })
@@ -125,6 +160,41 @@ class TestChat:
         messages = call_kwargs["messages"]
         assert len(messages) == 3
         assert messages[0] == {"role": "user", "content": "Hi"}
+
+
+# ── Group M2: tutor routing ───────────────────────────────────────────
+
+
+class TestTutorRouting:
+    def test_routes_to_selected_tutor(self, multi_tutor_client):
+        client, mock_claude = multi_tutor_client
+        resp = client.post("/api/chat", json={
+            "user_id": "u",
+            "tutor": "ruby",
+            "question": "Tell me about a ruby block",
+            "conversation_history": [],
+        })
+        assert resp.status_code == 200
+        assert resp.json()["usage"]["retrieval"]["topic"] == "RubyBlock"
+
+    def test_missing_tutor_rejected(self, multi_tutor_client):
+        client, _ = multi_tutor_client
+        resp = client.post("/api/chat", json={
+            "user_id": "u",
+            "question": "anything",
+            "conversation_history": [],
+        })
+        assert resp.status_code == 422
+
+    def test_unknown_tutor_rejected(self, multi_tutor_client):
+        client, _ = multi_tutor_client
+        resp = client.post("/api/chat", json={
+            "user_id": "u",
+            "tutor": "cobol",
+            "question": "anything",
+            "conversation_history": [],
+        })
+        assert resp.status_code == 422
 
 
 # ── Group N: GET /api/health ──────────────────────────────────────────
@@ -137,7 +207,7 @@ class TestHealth:
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] == "ok"
-        assert data["topics"] == 6  # mini_notes has 6 files
+        assert data["tutors"] == {"python": 6}  # mini_notes has 6 files
 
 
 # ── Group O: CORS ─────────────────────────────────────────────────────
@@ -150,7 +220,7 @@ class TestCors:
             "https://joecardoso.dev",
             "https://www.joecardoso.dev",
             "http://localhost:4321",
-            "https://brush-up-py-git-main-joe.vercel.app",
+            "https://brush-up-git-main-joe.vercel.app",
         ],
     )
     def test_preflight_allows_configured_origins(self, app_client, origin):
@@ -197,6 +267,7 @@ class TestApiErrorHandling:
         )
         resp = client.post("/api/chat", json={
             "user_id": "test-user",
+            "tutor": "python",
             "question": "What is Alpha?",
             "conversation_history": [],
         })
@@ -212,6 +283,7 @@ class TestApiErrorHandling:
         )
         resp = client.post("/api/chat", json={
             "user_id": "test-user",
+            "tutor": "python",
             "question": "What is Alpha?",
             "conversation_history": [],
         })
@@ -225,6 +297,7 @@ class TestApiErrorHandling:
         )
         resp = client.post("/api/chat", json={
             "user_id": "test-user",
+            "tutor": "python",
             "question": "What is Alpha?",
             "conversation_history": [],
         })

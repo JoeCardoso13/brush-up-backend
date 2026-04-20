@@ -84,8 +84,8 @@ def tfidf_index(tfidf_graph):
 
 @pytest.fixture(scope="session")
 def real_graph():
-    """Build a DiGraph from the real notes corpus."""
-    return build_graph(Path(__file__).resolve().parent.parent / "notes")
+    """Build a DiGraph from the real Python notes corpus."""
+    return build_graph(Path(__file__).resolve().parent.parent / "notes" / "python")
 
 
 @pytest.fixture(scope="session")

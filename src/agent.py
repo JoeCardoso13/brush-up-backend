@@ -1,4 +1,4 @@
-"""Teaching agent — gathers graph context and calls Claude to teach Python."""
+"""Teaching agent — gathers graph context and calls Claude to teach a programming language."""
 
 import logging
 import os
@@ -21,7 +21,7 @@ def build_system_prompt(context: dict) -> str:
         return (
             f"{_TUTOR_PROMPT}\n\n---\n\n"
             "The student asked about a topic not found in your notes. "
-            "Help them rephrase or suggest related Python topics."
+            "Help them rephrase or suggest related topics from your notes."
         )
 
     parts = [

@@ -23,7 +23,7 @@ class TestApiE2E:
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] == "ok"
-        assert data["topics"] > 0
+        assert sum(data["tutors"].values()) > 0
 
     def test_budget_exceeded_short_circuits_before_external_api_call(self):
         api = _fresh_api_module()
@@ -40,6 +40,7 @@ class TestApiE2E:
                 "/api/chat",
                 json={
                     "user_id": "heavy-user",
+                    "tutor": "python",
                     "question": "Explain classes",
                     "conversation_history": [],
                 },
