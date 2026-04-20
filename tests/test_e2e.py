@@ -57,6 +57,7 @@ def _chat(client, question, history=None):
     """Send a question through POST /api/chat and return (response_json, mock_client)."""
     return client.post("/api/chat", json={
         "user_id": "e2e-test-user",
+        "tutor": "python",
         "question": question,
         "conversation_history": history or [],
     })

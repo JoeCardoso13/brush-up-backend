@@ -54,5 +54,5 @@ ANTHROPIC_API_KEY=... uvicorn api:app --app-dir src --port 8080
 - Per-user token budget is tracked in-memory via `src/budget.py` (250K input / 60K output defaults, configurable via env vars)
 - No rate limiting — budget tracking is the sole abuse-control mechanism
 - Identity is a frontend-generated UUID in localStorage; ephemeral by design
-- `ChatRequest` takes `tutor: "python" | "ruby" | "javascript"` (defaults to `"python"`); one budget per `user_id`, shared across tutors
+- `ChatRequest` takes `tutor: "python" | "ruby" | "javascript"` (required, no default — each tutor lives on its own frontend page); one budget per `user_id`, shared across tutors
 - `/api/health` returns `{"status": "ok", "tutors": {name: node_count}}`

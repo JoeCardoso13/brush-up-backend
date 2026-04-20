@@ -79,7 +79,7 @@ app.add_middleware(
 
 class ChatRequest(BaseModel):
     user_id: str = Field(min_length=1, max_length=100)
-    tutor: Tutor = "python"
+    tutor: Tutor
     question: str = Field(min_length=1, max_length=2000)
     conversation_history: list[dict] = Field(default_factory=list, max_length=50)
 

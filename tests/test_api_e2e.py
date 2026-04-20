@@ -40,6 +40,7 @@ class TestApiE2E:
                 "/api/chat",
                 json={
                     "user_id": "heavy-user",
+                    "tutor": "python",
                     "question": "Explain classes",
                     "conversation_history": [],
                 },

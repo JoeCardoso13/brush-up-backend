@@ -83,6 +83,7 @@ class TestChat:
         client, _, _ = app_client
         resp = client.post("/api/chat", json={
             "user_id": "test-user",
+            "tutor": "python",
             "question": "What is Alpha?",
             "conversation_history": [],
         })
@@ -97,6 +98,7 @@ class TestChat:
         client, _, test_budgets = app_client
         client.post("/api/chat", json={
             "user_id": "test-user",
+            "tutor": "python",
             "question": "What is Alpha?",
             "conversation_history": [],
         })
@@ -107,6 +109,7 @@ class TestChat:
         record_usage(test_budgets, "big-spender", 9999999, 9999999)
         resp = client.post("/api/chat", json={
             "user_id": "big-spender",
+            "tutor": "python",
             "question": "What is Alpha?",
             "conversation_history": [],
         })
@@ -117,6 +120,7 @@ class TestChat:
         client, _, _ = app_client
         resp = client.post("/api/chat", json={
             "user_id": "test-user",
+            "tutor": "python",
             "question": "",
             "conversation_history": [],
         })
@@ -134,6 +138,7 @@ class TestChat:
         client, mock_claude, _ = app_client
         client.post("/api/chat", json={
             "user_id": "test-user",
+            "tutor": "python",
             "question": "What is Alpha?",
             "conversation_history": [],
         })
@@ -147,6 +152,7 @@ class TestChat:
         ]
         client.post("/api/chat", json={
             "user_id": "test-user",
+            "tutor": "python",
             "question": "What is Alpha?",
             "conversation_history": history,
         })
@@ -170,6 +176,15 @@ class TestTutorRouting:
         })
         assert resp.status_code == 200
         assert resp.json()["usage"]["retrieval"]["topic"] == "RubyBlock"
+
+    def test_missing_tutor_rejected(self, multi_tutor_client):
+        client, _ = multi_tutor_client
+        resp = client.post("/api/chat", json={
+            "user_id": "u",
+            "question": "anything",
+            "conversation_history": [],
+        })
+        assert resp.status_code == 422
 
     def test_unknown_tutor_rejected(self, multi_tutor_client):
         client, _ = multi_tutor_client
@@ -252,6 +267,7 @@ class TestApiErrorHandling:
         )
         resp = client.post("/api/chat", json={
             "user_id": "test-user",
+            "tutor": "python",
             "question": "What is Alpha?",
             "conversation_history": [],
         })
@@ -267,6 +283,7 @@ class TestApiErrorHandling:
         )
         resp = client.post("/api/chat", json={
             "user_id": "test-user",
+            "tutor": "python",
             "question": "What is Alpha?",
             "conversation_history": [],
         })
@@ -280,6 +297,7 @@ class TestApiErrorHandling:
         )
         resp = client.post("/api/chat", json={
             "user_id": "test-user",
+            "tutor": "python",
             "question": "What is Alpha?",
             "conversation_history": [],
         })
