@@ -1,6 +1,6 @@
 # Brush Up backend
 
-Backend for [Brush Up](https://www.joecardoso.dev/brush-up-py), a small AI-powered tutor for Python, Ruby, and JavaScript built to showcase applied product and engineering work.
+Backend for [Brush Up Python](https://www.joecardoso.dev/brush-up-py), [Brush Up Ruby](https://www.joecardoso.dev/brush-up-rb), and [Brush Up JavaScript](https://www.joecardoso.dev/brush-up-js). A small AI-powered backend for tutors of Python, Ruby, and JavaScript built to showcase applied product and engineering work. You can read about its creation in my [blog post](https://www.joecardoso.dev/blog/zettelkasten-mvp).
 
 The app answers programming questions by grounding model responses in a personal Zettelkasten-style knowledge base of interconnected markdown notes. This repository contains the backend API, retrieval pipeline, tutor prompt, and test suite.
 
