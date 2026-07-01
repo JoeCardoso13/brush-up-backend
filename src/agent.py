@@ -9,7 +9,41 @@ from graph import TfidfIndex, get_context
 
 logger = logging.getLogger("brush-up.agent")
 
-MODEL = os.environ.get("BRUSH_UP_MODEL", "claude-sonnet-4-20250514")
+DEFAULT_MODEL = "claude-sonnet-5"
+MODEL = os.environ.get("BRUSH_UP_MODEL", DEFAULT_MODEL)
+
+
+def resolve_model(client, configured=None):
+    """Validate the configured model against the Models API, falling back if retired.
+
+    Anthropic model IDs are pinned snapshots that eventually retire (404).
+    If the configured model is gone, pick the newest ``claude-sonnet-*`` so the
+    app degrades to a same-tier model instead of failing every chat request.
+    Transient validation errors return the configured model unvalidated —
+    a flaky startup check must not take the app down when the pin is fine.
+    """
+    if configured is None:
+        configured = MODEL
+    try:
+        client.models.retrieve(configured)
+        return configured
+    except anthropic.NotFoundError:
+        sonnets = [m for m in client.models.list() if m.id.startswith("claude-sonnet")]
+        if not sonnets:
+            raise RuntimeError(
+                f"model {configured!r} is unavailable and no claude-sonnet-* fallback exists"
+            )
+        fallback = max(sonnets, key=lambda m: m.created_at)
+        logger.warning(
+            "model %r is unavailable (retired?); falling back to %r",
+            configured,
+            fallback.id,
+        )
+        return fallback.id
+    except (anthropic.APIError, TypeError) as exc:
+        # TypeError: the SDK raises it when no credentials are configured
+        logger.warning("model validation failed (%s); using %r unvalidated", exc, configured)
+        return configured
 
 _TUTOR_PROMPT_PATH = Path(__file__).resolve().parent.parent / "tutor_prompt.md"
 _TUTOR_PROMPT = _TUTOR_PROMPT_PATH.read_text(encoding="utf-8")
@@ -43,7 +77,7 @@ def build_messages(history: list[dict], question: str) -> list[dict]:
     return history + [{"role": "user", "content": question}]
 
 
-def ask(graph, question: str, conversation_history: list[dict], *, client=None, index=None):
+def ask(graph, question: str, conversation_history: list[dict], *, client=None, index=None, model=None):
     """Find relevant context, call Claude, return (response_text, updated_history, usage).
 
     ``usage`` includes token counts and a ``retrieval`` dict with
@@ -77,13 +111,13 @@ def ask(graph, question: str, conversation_history: list[dict], *, client=None, 
     messages = build_messages(conversation_history, question)
 
     response = client.messages.create(
-        model=MODEL,
+        model=model or MODEL,
         max_tokens=1024,
         system=system_prompt,
         messages=messages,
     )
 
-    assistant_text = response.content[0].text
+    assistant_text = next((b.text for b in response.content if b.type == "text"), "")
     updated_history = messages + [{"role": "assistant", "content": assistant_text}]
     usage = {
         "input_tokens": response.usage.input_tokens,

@@ -100,7 +100,7 @@ uv run pytest
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `ANTHROPIC_API_KEY` | none | Required for model calls |
-| `BRUSH_UP_MODEL` | `claude-sonnet-4-20250514` | Anthropic model used by the tutor |
+| `BRUSH_UP_MODEL` | `claude-sonnet-5` | Anthropic model used by the tutor. Validated at startup; if retired, the app falls back to the newest available `claude-sonnet-*` model |
 | `BRUSH_UP_INPUT_BUDGET` | `250000` | Per-user input token cap |
 | `BRUSH_UP_OUTPUT_BUDGET` | `60000` | Per-user output token cap |
 | `BRUSH_UP_ALLOWED_ORIGINS` | built-in allowlist | Comma-separated CORS origins |
@@ -151,7 +151,7 @@ Behavior notes:
 
 ### `GET /api/health`
 
-Returns service status plus the number of topics loaded into each tutor's graph, e.g. `{"status": "ok", "tutors": {"python": 127, "ruby": 42, "javascript": 30}}`.
+Returns service status, the resolved model, and the number of topics loaded into each tutor's graph, e.g. `{"status": "ok", "model": "claude-sonnet-5", "tutors": {"python": 127, "ruby": 42, "javascript": 30}}`.
 
 ## Deployment
 

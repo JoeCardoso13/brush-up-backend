@@ -48,12 +48,12 @@ ANTHROPIC_API_KEY=... uvicorn api:app --app-dir src --port 8080
 - Dangling links (to notes that don't exist) are silently ignored
 - `TfidfIndex` provides content-based retrieval with title boosting and wikilink-aware tokenization
 - The tutor prompt is loaded once at module import from `tutor_prompt.md`
-- Model is configured in `src/agent.py` via `BRUSH_UP_MODEL`, defaulting to Sonnet 4
+- Model is configured in `src/agent.py` via `BRUSH_UP_MODEL`, defaulting to Sonnet 5 (`claude-sonnet-5`). `resolve_model()` validates it at startup and falls back to the newest `claude-sonnet-*` if the pin has been retired (fails open on transient errors)
 - `ask(...)` returns `(response_text, updated_history, usage_dict)`
 - Conversation history is passed in by the caller; the backend does not persist chat history server-side
 - Per-user token budget is tracked in-memory via `src/budget.py` (250K input / 60K output defaults, configurable via env vars)
 - No rate limiting — budget tracking is the sole abuse-control mechanism
 - Identity is a frontend-generated UUID in localStorage; ephemeral by design
 - `ChatRequest` takes `tutor: "python" | "ruby" | "javascript"` (required, no default — each tutor lives on its own frontend page); one budget per `user_id`, shared across tutors
-- `/api/health` returns `{"status": "ok", "tutors": {name: node_count}}`
+- `/api/health` returns `{"status": "ok", "model": <resolved model id>, "tutors": {name: node_count}}`
 - The Fly app name (`brush-up-py`) is the only stale reference to the old single-language naming; renaming would require app re-creation and frontend URL update

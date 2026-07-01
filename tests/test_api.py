@@ -16,7 +16,10 @@ def _make_mock_client(response_text="Here is my explanation."):
     """Create a mock Anthropic client that returns a canned response."""
     client = MagicMock()
     mock_response = MagicMock()
-    mock_response.content = [MagicMock(text=response_text)]
+    text_block = MagicMock()
+    text_block.type = "text"
+    text_block.text = response_text
+    mock_response.content = [text_block]
     mock_response.usage.input_tokens = 100
     mock_response.usage.output_tokens = 50
     client.messages.create.return_value = mock_response
@@ -313,3 +316,56 @@ class TestRemovedEndpoints:
         client, _, _ = app_client
         resp = client.get("/api/usage/test-user")
         assert resp.status_code == 404
+
+
+# ── Group P: model resolution wiring ───────────────────────────────────
+
+
+class TestModelWiring:
+    def test_health_reports_resolved_model(self, app_client):
+        import api
+        client, _, _ = app_client
+        api.app.state.model = "claude-resolved-model"
+        resp = client.get("/api/health")
+        assert resp.status_code == 200
+        assert resp.json()["model"] == "claude-resolved-model"
+
+    def test_chat_uses_resolved_model(self, app_client):
+        import api
+        client, mock_client, _ = app_client
+        api.app.state.model = "claude-resolved-model"
+        resp = client.post("/api/chat", json={
+            "user_id": "test-user",
+            "tutor": "python",
+            "question": "What is Alpha?",
+            "conversation_history": [],
+        })
+        assert resp.status_code == 200
+        assert mock_client.messages.create.call_args.kwargs["model"] == "claude-resolved-model"
+
+    def test_chat_works_without_resolved_model(self, app_client):
+        """Fixtures that don't set app.state.model must keep working (falls back to agent.MODEL)."""
+        import api
+        client, _, _ = app_client
+        if hasattr(api.app.state, "model"):
+            del api.app.state.model
+        resp = client.post("/api/chat", json={
+            "user_id": "test-user",
+            "tutor": "python",
+            "question": "What is Alpha?",
+            "conversation_history": [],
+        })
+        assert resp.status_code == 200
+
+    def test_lifespan_resolves_model(self, monkeypatch):
+        """The real lifespan must resolve the model once and store it on app.state."""
+        import api
+        mock_client = _make_mock_client()
+        monkeypatch.setattr(api.anthropic, "Anthropic", lambda **kw: mock_client)
+        monkeypatch.setattr(api, "resolve_model", lambda client: "claude-resolved-at-startup")
+        from api import lifespan
+        api.app.router.lifespan_context = lifespan
+        with TestClient(api.app, raise_server_exceptions=True) as client:
+            assert api.app.state.model == "claude-resolved-at-startup"
+            resp = client.get("/api/health")
+            assert resp.json()["model"] == "claude-resolved-at-startup"

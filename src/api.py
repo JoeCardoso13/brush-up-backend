@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from agent import ask
+from agent import ask, resolve_model
 from budget import check_budget, record_usage
 from graph import TfidfIndex, build_tutors
 
@@ -57,6 +57,8 @@ async def lifespan(app: FastAPI):
     graphs = build_tutors(NOTES_DIR)
     app.state.tutors = {name: (g, TfidfIndex(g)) for name, g in graphs.items()}
     app.state.client = anthropic.Anthropic(max_retries=3)
+    app.state.model = resolve_model(app.state.client)
+    logger.info("Using model %s", app.state.model)
     app.state.budgets = {}
     for name, (g, _) in app.state.tutors.items():
         logger.info("Tutor %s loaded: %d topics", name, g.number_of_nodes())
@@ -118,7 +120,12 @@ def chat(req: ChatRequest, request: Request):
     start = time.monotonic()
     try:
         response_text, updated_history, usage = ask(
-            graph, req.question, req.conversation_history, client=client, index=index
+            graph,
+            req.question,
+            req.conversation_history,
+            client=client,
+            index=index,
+            model=getattr(request.app.state, "model", None),
         )
     except anthropic.APIStatusError as exc:
         if exc.status_code == 529:
@@ -163,5 +170,6 @@ def health(request: Request):
     tutors = request.app.state.tutors
     return {
         "status": "ok",
+        "model": getattr(request.app.state, "model", None),
         "tutors": {name: g.number_of_nodes() for name, (g, _) in tutors.items()},
     }

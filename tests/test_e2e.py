@@ -22,7 +22,10 @@ from graph import TfidfIndex
 def _make_mock_client(response_text="Here is my explanation."):
     client = MagicMock()
     mock_response = MagicMock()
-    mock_response.content = [MagicMock(text=response_text)]
+    text_block = MagicMock()
+    text_block.type = "text"
+    text_block.text = response_text
+    mock_response.content = [text_block]
     mock_response.usage.input_tokens = 100
     mock_response.usage.output_tokens = 50
     client.messages.create.return_value = mock_response

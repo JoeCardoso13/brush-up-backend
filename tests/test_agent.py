@@ -1,17 +1,25 @@
 """Tests for agent.py — teaching agent with mocked Anthropic API."""
 
+from datetime import datetime
 from unittest.mock import MagicMock
 
+import anthropic
+import httpx
 import networkx as nx
+import pytest
 
-from agent import build_system_prompt, build_messages, ask
+import agent
+from agent import build_system_prompt, build_messages, ask, resolve_model
 
 
 def _make_mock_client(response_text="Here is my explanation."):
     """Create a mock Anthropic client that returns a canned response."""
     client = MagicMock()
     mock_response = MagicMock()
-    mock_response.content = [MagicMock(text=response_text)]
+    text_block = MagicMock()
+    text_block.type = "text"
+    text_block.text = response_text
+    mock_response.content = [text_block]
     mock_response.usage.input_tokens = 100
     mock_response.usage.output_tokens = 50
     client.messages.create.return_value = mock_response
@@ -165,3 +173,116 @@ class TestTfidfRetrieval:
         )
         system_prompt = client.messages.create.call_args.kwargs["system"]
         assert "decorator" in system_prompt.lower()
+
+
+# ── Group J: model resolution ───────────────────────────────────────────
+
+
+def _model_entry(model_id, created_at):
+    """Fake Models API entry with id and created_at."""
+    entry = MagicMock()
+    entry.id = model_id
+    entry.created_at = created_at
+    return entry
+
+
+def _not_found_error():
+    req = httpx.Request("GET", "https://api.anthropic.com/v1/models/x")
+    resp = httpx.Response(404, request=req)
+    return anthropic.NotFoundError("model not found", response=resp, body=None)
+
+
+def _server_error():
+    req = httpx.Request("GET", "https://api.anthropic.com/v1/models/x")
+    resp = httpx.Response(529, request=req)
+    return anthropic.APIStatusError("overloaded", response=resp, body=None)
+
+
+class TestResolveModel:
+    def test_default_pin_is_sonnet_5(self):
+        assert getattr(agent, "DEFAULT_MODEL", None) == "claude-sonnet-5"
+
+    def test_returns_configured_when_valid(self):
+        client = MagicMock()
+        client.models.retrieve.return_value = MagicMock()
+        assert resolve_model(client, "claude-sonnet-5") == "claude-sonnet-5"
+        client.models.list.assert_not_called()
+
+    def test_defaults_to_module_model(self, monkeypatch):
+        monkeypatch.setattr(agent, "MODEL", "claude-test-pin")
+        client = MagicMock()
+        client.models.retrieve.return_value = MagicMock()
+        assert resolve_model(client) == "claude-test-pin"
+        client.models.retrieve.assert_called_once_with("claude-test-pin")
+
+    def test_falls_back_to_newest_sonnet_on_404(self):
+        client = MagicMock()
+        client.models.retrieve.side_effect = _not_found_error()
+        # Opus is newest overall — must NOT be picked; newest *Sonnet* wins.
+        client.models.list.return_value = [
+            _model_entry("claude-opus-9", datetime(2027, 5, 1)),
+            _model_entry("claude-sonnet-4-6", datetime(2025, 11, 24)),
+            _model_entry("claude-sonnet-5", datetime(2026, 6, 20)),
+            _model_entry("claude-haiku-4-5-20251001", datetime(2025, 10, 1)),
+        ]
+        assert resolve_model(client, "claude-sonnet-4-0") == "claude-sonnet-5"
+
+    def test_raises_when_no_sonnet_available(self):
+        client = MagicMock()
+        client.models.retrieve.side_effect = _not_found_error()
+        client.models.list.return_value = [
+            _model_entry("claude-opus-9", datetime(2027, 5, 1)),
+        ]
+        with pytest.raises(RuntimeError):
+            resolve_model(client, "claude-sonnet-4-0")
+
+    def test_fail_open_on_connection_error(self):
+        client = MagicMock()
+        client.models.retrieve.side_effect = anthropic.APIConnectionError(
+            request=httpx.Request("GET", "https://api.anthropic.com/v1/models/x")
+        )
+        assert resolve_model(client, "claude-sonnet-5") == "claude-sonnet-5"
+
+    def test_fail_open_on_server_error(self):
+        client = MagicMock()
+        client.models.retrieve.side_effect = _server_error()
+        assert resolve_model(client, "claude-sonnet-5") == "claude-sonnet-5"
+
+
+class TestAskModelParam:
+    def test_uses_explicit_model(self):
+        graph = _make_test_graph()
+        client = _make_mock_client()
+        ask(graph, "What is a class?", [], client=client, model="claude-explicit-x")
+        assert client.messages.create.call_args.kwargs["model"] == "claude-explicit-x"
+
+    def test_defaults_to_module_model_when_not_passed(self, monkeypatch):
+        monkeypatch.setattr(agent, "MODEL", "claude-default-y")
+        graph = _make_test_graph()
+        client = _make_mock_client()
+        ask(graph, "What is a class?", [], client=client)
+        assert client.messages.create.call_args.kwargs["model"] == "claude-default-y"
+
+
+# ── Group K: thinking-block handling (regression) ──────────────────────
+
+
+class TestThinkingBlocks:
+    def test_ask_skips_thinking_blocks(self):
+        """Sonnet 5 responses can lead with a ThinkingBlock; ask() must return
+        the first *text* block, not blow up on content[0].text (prod 500, 2026-07-01)."""
+        graph = _make_test_graph()
+        client = MagicMock()
+        thinking_block = MagicMock(spec=["type", "thinking"])
+        thinking_block.type = "thinking"
+        text_block = MagicMock()
+        text_block.type = "text"
+        text_block.text = "Here is the actual answer."
+        mock_response = MagicMock()
+        mock_response.content = [thinking_block, text_block]
+        mock_response.usage.input_tokens = 100
+        mock_response.usage.output_tokens = 50
+        client.messages.create.return_value = mock_response
+        response, history, _ = ask(graph, "What is a class?", [], client=client)
+        assert response == "Here is the actual answer."
+        assert history[-1] == {"role": "assistant", "content": "Here is the actual answer."}
